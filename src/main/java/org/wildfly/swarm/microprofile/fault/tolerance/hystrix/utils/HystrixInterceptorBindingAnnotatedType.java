@@ -32,7 +32,7 @@ import javax.enterprise.inject.spi.AnnotatedParameter;
 import javax.enterprise.inject.spi.AnnotatedType;
 import javax.enterprise.util.Nonbinding;
 
-import org.wildfly.swarm.microprofile.fault.tolerance.hystrix.HystrixCommand;
+import org.wildfly.swarm.microprofile.fault.tolerance.hystrix.HystrixCommandBinding;
 import org.wildfly.swarm.microprofile.fault.tolerance.hystrix.literal.NonbindingLiteral;
 
 /**
@@ -43,7 +43,7 @@ public class HystrixInterceptorBindingAnnotatedType<T extends Annotation> implem
     public HystrixInterceptorBindingAnnotatedType(AnnotatedType<T> delegate) {
         this.delegate = delegate;
         annotations = new HashSet<>(delegate.getAnnotations());
-        annotations.add(HystrixCommand.Literal.INSTANCE);
+        annotations.add(HystrixCommandBinding.Literal.INSTANCE);
     }
 
     public Class<T> getJavaClass() {
@@ -74,8 +74,8 @@ public class HystrixInterceptorBindingAnnotatedType<T extends Annotation> implem
     }
 
     public <S extends Annotation> S getAnnotation(Class<S> annotationType) {
-        if (HystrixCommand.class.equals(annotationType)) {
-            return (S) HystrixCommand.Literal.INSTANCE;
+        if (HystrixCommandBinding.class.equals(annotationType)) {
+            return (S) HystrixCommandBinding.Literal.INSTANCE;
         }
         return delegate.getAnnotation(annotationType);
     }
@@ -85,10 +85,7 @@ public class HystrixInterceptorBindingAnnotatedType<T extends Annotation> implem
     }
 
     public boolean isAnnotationPresent(Class<? extends Annotation> annotationType) {
-        if (HystrixCommand.class.equals(annotationType)) {
-            return true;
-        }
-        return delegate.isAnnotationPresent(annotationType);
+        return HystrixCommandBinding.class.equals(annotationType) || delegate.isAnnotationPresent(annotationType);
     }
 
     private AnnotatedType<T> delegate;
@@ -142,10 +139,7 @@ public class HystrixInterceptorBindingAnnotatedType<T extends Annotation> implem
         }
 
         public boolean isAnnotationPresent(Class<? extends Annotation> annotationType) {
-            if (Nonbinding.class.equals(annotationType)) {
-                return true;
-            }
-            return delegate.isAnnotationPresent(annotationType);
+            return Nonbinding.class.equals(annotationType) || delegate.isAnnotationPresent(annotationType);
         }
 
         private AnnotatedMethod<X> delegate;

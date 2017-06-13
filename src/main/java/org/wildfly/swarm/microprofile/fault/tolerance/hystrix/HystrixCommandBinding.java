@@ -36,11 +36,11 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Documented
 @InterceptorBinding
-public @interface HystrixCommand {
+public @interface HystrixCommandBinding {
 
-    class Literal extends AnnotationLiteral<HystrixCommand> implements HystrixCommand {
+    class Literal extends AnnotationLiteral<HystrixCommandBinding> implements HystrixCommandBinding {
 
-        public static final HystrixCommand INSTANCE = new Literal();
+        public static final HystrixCommandBinding INSTANCE = new Literal();
 
         private static final long serialVersionUID = -6161473059431308528L;
     }

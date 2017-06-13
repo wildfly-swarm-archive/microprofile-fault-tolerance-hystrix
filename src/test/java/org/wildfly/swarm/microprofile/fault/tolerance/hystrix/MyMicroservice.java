@@ -16,12 +16,13 @@
 
 package org.wildfly.swarm.microprofile.fault.tolerance.hystrix;
 
-import java.util.concurrent.Future;
+import java.time.temporal.ChronoUnit;
 
 import javax.enterprise.context.ApplicationScoped;
 
 import org.eclipse.microprofile.fault.tolerance.inject.Asynchronous;
-import org.eclipse.microprofile.fault.tolerance.inject.Retry;
+import org.eclipse.microprofile.fault.tolerance.inject.Fallback;
+import org.eclipse.microprofile.fault.tolerance.inject.TimeOut;
 
 
 /**
@@ -31,9 +32,23 @@ import org.eclipse.microprofile.fault.tolerance.inject.Retry;
 public class MyMicroservice {
 
     @Asynchronous
-    public Object sayHello()  {
+    @TimeOut(timeOutUnit = ChronoUnit.SECONDS, timeOut = 7)
+    //@Fallback(handler = MyFallbackHandler.class)
+    public Object sayHello() {
         try {
-            Thread.sleep(1000);
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        return "Hello";
+    }
+
+    @Asynchronous
+    @TimeOut(timeOutUnit = ChronoUnit.SECONDS, timeOut = 7)
+    @Fallback(handler = MyFallbackHandler.class)
+    public Object sayHelloWithFailback() {
+        try {
+            Thread.sleep(5000);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }

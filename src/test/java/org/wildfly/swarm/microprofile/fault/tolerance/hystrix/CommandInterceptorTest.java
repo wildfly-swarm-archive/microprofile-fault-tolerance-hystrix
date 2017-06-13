@@ -21,6 +21,8 @@ import java.util.concurrent.Future;
 
 import javax.inject.Inject;
 
+import com.netflix.config.ConfigurationManager;
+import org.apache.commons.configuration.AbstractConfiguration;
 import org.jboss.weld.environment.se.Weld;
 import org.jboss.weld.junit4.WeldInitiator;
 import org.junit.Assert;
@@ -45,19 +47,53 @@ public class CommandInterceptorTest {
             .build();
 
     @Test
-    public void testHello() {
+    public void shouldRunWithLongExecutionTime() {
         Object res = mm.sayHello();
         try {
-            Assert.assertEquals("Hello",((Future)res).get());
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        } catch (ExecutionException e) {
-            e.printStackTrace();
+            Assert.assertEquals("Hello", ((Future) res).get());
+        } catch (InterruptedException | ExecutionException e) {
+            Assert.fail("Timeout");
         }
     }
 
+
+    @Test(expected = MicroprofileHystrixException.class)
+    public void shouldTimeout() {
+        AbstractConfiguration conf = ConfigurationManager.getConfigInstance();
+
+        conf.setProperty("hystrix.command.DefaultCommand.execution.isolation.thread.timeoutInMilliseconds",
+                         new Long(1000));
+        Object res = mm.sayHello();
+        try {
+            ((Future) res).get();
+            Assert.fail("Should have been in timeout state");
+        } catch (InterruptedException | ExecutionException e) {
+            throw new MicroprofileHystrixException("expected timeout", e);
+        } finally {
+            conf.clearProperty("hystrix.command.DefaultCommand.execution.isolation.thread.timeoutInMilliseconds");
+        }
+    }
+
+
+    @Test
+    public void shouldFallbackAfterTimeout() {
+        AbstractConfiguration conf = ConfigurationManager.getConfigInstance();
+
+        conf.setProperty("hystrix.command.DefaultCommand.execution.isolation.thread.timeoutInMilliseconds",
+                         new Long(1000));
+        Object res = mm.sayHelloWithFailback();
+        try {
+            Assert.assertEquals("Store is closed", ((Future) res).get());
+        } catch (InterruptedException | ExecutionException e) {
+            throw new MicroprofileHystrixException("expected timeout", e);
+        } finally {
+            conf.clearProperty("hystrix.command.DefaultCommand.execution.isolation.thread.timeoutInMilliseconds");
+
+        }
+    }
+
+
     @Inject
     MyMicroservice mm;
-
 
 }

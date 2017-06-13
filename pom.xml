@@ -33,7 +33,7 @@
     <microprofile-fault-tolerance-api.version>1.0-SNAPSHOT</microprofile-fault-tolerance-api.version>
     <cdi-api.version>1.2</cdi-api.version>
     <javax.annotation-api.version>1.2</javax.annotation-api.version>
-    <hystrix-core.version>1.4.3</hystrix-core.version>
+    <hystrix-core.version>1.5.12</hystrix-core.version>
     <weld-junit4.version>1.1.0.Final</weld-junit4.version>
   </properties>
 
@@ -67,12 +67,6 @@
       <version>${weld-junit4.version}</version>
       <scope>test</scope>
     </dependency>
-    <dependency>
-      <groupId>io.reactivex</groupId>
-      <artifactId>rxjava</artifactId>
-      <version>1.0.10</version>
-    </dependency>
-
   </dependencies>
 
 

@@ -16,13 +16,25 @@
 
 package org.wildfly.swarm.microprofile.fault.tolerance.hystrix;
 
-import java.util.concurrent.Future;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Method;
+import java.time.Duration;
 
 import javax.annotation.Priority;
-import javax.inject.Inject;
 import javax.interceptor.AroundInvoke;
 import javax.interceptor.Interceptor;
 import javax.interceptor.InvocationContext;
+
+import com.netflix.hystrix.HystrixCommandGroupKey;
+import com.netflix.hystrix.HystrixCommandProperties;
+import org.eclipse.microprofile.fault.tolerance.inject.Asynchronous;
+import org.eclipse.microprofile.fault.tolerance.inject.CircuitBreaker;
+import org.eclipse.microprofile.fault.tolerance.inject.Fallback;
+import org.eclipse.microprofile.fault.tolerance.inject.FallbackHandler;
+import org.eclipse.microprofile.fault.tolerance.inject.Retry;
+import org.eclipse.microprofile.fault.tolerance.inject.TimeOut;
+
+import static com.netflix.hystrix.HystrixCommand.Setter;
 
 
 /**
@@ -30,29 +42,55 @@ import javax.interceptor.InvocationContext;
  */
 
 @Interceptor
-@HystrixCommand
-@Priority(Interceptor.Priority.LIBRARY_BEFORE)
+@HystrixCommandBinding
+@Priority(Interceptor.Priority.LIBRARY_AFTER + 1)
 public class HystrixCommandInterceptor {
-
-
-    @Inject
-    DefaultCommand command;
 
 
     @AroundInvoke
     public Object timeMethod(InvocationContext ic) throws Exception {
-        System.out.println("Intercepted");
-        command.setToRun(() -> {
-            Object res = null;
-            try {
-                res = ic.proceed();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-            finally {
-                return res;
-            }
-        });
-        return command.queue();
+
+        Method method = ic.getMethod();
+        ExecutionContextWithInvocationContext ec = new ExecutionContextWithInvocationContext(ic);
+        Asynchronous async = getAnnotation(method, Asynchronous.class);
+        TimeOut timeout = getAnnotation(method, TimeOut.class);
+        CircuitBreaker circuitBreaker = getAnnotation(method, CircuitBreaker.class);
+        Retry retry = getAnnotation(method, Retry.class);
+        Fallback fallback = getAnnotation(method, Fallback.class);
+        HystrixCommandProperties.Setter setter = HystrixCommandProperties.Setter();
+
+        if (timeout != null) {
+            long timeoutmillis = Duration.of(timeout.timeOut(), timeout.timeOutUnit()).toMillis();
+            setter = setter.withExecutionTimeoutInMilliseconds((int) timeoutmillis);
+        }
+
+        DefaultCommand command = new DefaultCommand(Setter
+                                                            .withGroupKey(HystrixCommandGroupKey.Factory.asKey("DefaultCommandGroup"))
+                                                            .andCommandPropertiesDefaults(setter));
+
+        command.setToRun(ec::proceed);
+
+
+        if (fallback != null) {
+            FallbackHandler fbh = fallback.handler().newInstance();
+            command.setFallback(() -> fbh.handle(ec));
+        }
+
+        if (async != null) {
+            return command.queue();
+        } else {
+            return command.execute();
+        }
     }
+
+
+    private <T extends Annotation> T getAnnotation(Method method, Class<T> annotation) {
+        if (method.isAnnotationPresent(annotation)) {
+            return method.getAnnotation(annotation);
+        } else if (method.getDeclaringClass().isAnnotationPresent(annotation)) {
+            return method.getDeclaringClass().getAnnotation(annotation);
+        }
+        return null;
+    }
+
 }

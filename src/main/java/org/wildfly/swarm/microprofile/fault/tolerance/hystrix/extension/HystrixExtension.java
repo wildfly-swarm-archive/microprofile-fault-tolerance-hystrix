@@ -16,21 +16,14 @@
 
 package org.wildfly.swarm.microprofile.fault.tolerance.hystrix.extension;
 
-import java.lang.reflect.Method;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.stream.Collectors;
-
 import javax.enterprise.event.Observes;
-import javax.enterprise.inject.spi.AnnotatedMethod;
 import javax.enterprise.inject.spi.BeanManager;
 import javax.enterprise.inject.spi.BeforeBeanDiscovery;
 import javax.enterprise.inject.spi.Extension;
-import javax.enterprise.inject.spi.ProcessAnnotatedType;
-import javax.enterprise.inject.spi.WithAnnotations;
 
 import org.eclipse.microprofile.fault.tolerance.inject.Asynchronous;
 import org.eclipse.microprofile.fault.tolerance.inject.CircuitBreaker;
+import org.eclipse.microprofile.fault.tolerance.inject.Fallback;
 import org.eclipse.microprofile.fault.tolerance.inject.Retry;
 import org.eclipse.microprofile.fault.tolerance.inject.TimeOut;
 import org.wildfly.swarm.microprofile.fault.tolerance.hystrix.utils.HystrixInterceptorBindingAnnotatedType;
@@ -46,18 +39,22 @@ public class HystrixExtension implements Extension {
         bbd.addInterceptorBinding(new HystrixInterceptorBindingAnnotatedType<>(bm.createAnnotatedType(Retry.class)));
         bbd.addInterceptorBinding(new HystrixInterceptorBindingAnnotatedType<>(bm.createAnnotatedType(TimeOut.class)));
         bbd.addInterceptorBinding(new HystrixInterceptorBindingAnnotatedType<>(bm.createAnnotatedType(Asynchronous.class)));
+        bbd.addInterceptorBinding(new HystrixInterceptorBindingAnnotatedType<>(bm.createAnnotatedType(Fallback.class)));
     }
 
-    void registerAllAsynchronousMethod(@Observes @WithAnnotations(Asynchronous.class) ProcessAnnotatedType<?> pat) {
+    /*void registerAllAsynchronousMethod(@Observes @WithAnnotations(Asynchronous.class) ProcessAnnotatedType<?> pat) {
 
-        if (pat.getAnnotatedType().isAnnotationPresent(Asynchronous.class))
-
-            pat.getAnnotatedType().getMethods().stream()
+        if (pat.getAnnotatedType().isAnnotationPresent(Asynchronous.class)) {
+            asyncMethods = pat.getAnnotatedType().getMethods().stream()
+                    .map(AnnotatedMethod::getJavaMember).collect(Collectors.toSet());
+        } else {
+            asyncMethods = pat.getAnnotatedType().getMethods().stream()
                     .filter(m -> m.isAnnotationPresent(Asynchronous.class))
                     .map(AnnotatedMethod::getJavaMember).collect(Collectors.toSet());
+        }
     }
 
-    private Set<Method> asyncMethods = new HashSet<>();
+    private Set<Method> asyncMethods = new HashSet<>();*/
 
 
 }

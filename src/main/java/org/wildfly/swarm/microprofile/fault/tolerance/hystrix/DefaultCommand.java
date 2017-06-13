@@ -18,15 +18,12 @@ package org.wildfly.swarm.microprofile.fault.tolerance.hystrix;
 
 import java.util.function.Supplier;
 
-import javax.enterprise.context.Dependent;
-
 import com.netflix.hystrix.HystrixCommandGroupKey;
 import com.netflix.hystrix.HystrixThreadPoolKey;
 
 /**
  * @author Antoine Sabot-Durand
  */
-@Dependent
 public class DefaultCommand<R> extends com.netflix.hystrix.HystrixCommand<R> {
 
 
@@ -67,5 +64,19 @@ public class DefaultCommand<R> extends com.netflix.hystrix.HystrixCommand<R> {
         return toRun.get();
     }
 
-    private Supplier<R> toRun;
+    @Override
+    protected R getFallback() {
+        if (fallback == null) {
+            return super.getFallback();
+        }
+        return fallback.get();
+    }
+
+    public void setFallback(Supplier<R> fallback) {
+        this.fallback = fallback;
+    }
+
+    private Supplier<R> fallback = null;
+
+    private Supplier<R> toRun = null;
 }
