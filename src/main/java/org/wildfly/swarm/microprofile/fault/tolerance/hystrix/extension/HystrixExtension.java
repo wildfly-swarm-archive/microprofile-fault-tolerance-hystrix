@@ -16,7 +16,16 @@
 
 package org.wildfly.swarm.microprofile.fault.tolerance.hystrix.extension;
 
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Type;
+import java.util.HashSet;
+import java.util.Set;
+
 import javax.enterprise.event.Observes;
+import javax.enterprise.inject.spi.AnnotatedConstructor;
+import javax.enterprise.inject.spi.AnnotatedField;
+import javax.enterprise.inject.spi.AnnotatedMethod;
+import javax.enterprise.inject.spi.AnnotatedType;
 import javax.enterprise.inject.spi.BeanManager;
 import javax.enterprise.inject.spi.BeforeBeanDiscovery;
 import javax.enterprise.inject.spi.Extension;
@@ -25,8 +34,8 @@ import org.eclipse.microprofile.fault.tolerance.inject.Asynchronous;
 import org.eclipse.microprofile.fault.tolerance.inject.CircuitBreaker;
 import org.eclipse.microprofile.fault.tolerance.inject.Fallback;
 import org.eclipse.microprofile.fault.tolerance.inject.Retry;
-import org.eclipse.microprofile.fault.tolerance.inject.TimeOut;
-import org.wildfly.swarm.microprofile.fault.tolerance.hystrix.utils.HystrixInterceptorBindingAnnotatedType;
+import org.eclipse.microprofile.fault.tolerance.inject.Timeout;
+import org.wildfly.swarm.microprofile.fault.tolerance.hystrix.HystrixCommandBinding;
 
 /**
  * @author Antoine Sabot-Durand
@@ -37,7 +46,7 @@ public class HystrixExtension implements Extension {
 
         bbd.addInterceptorBinding(new HystrixInterceptorBindingAnnotatedType<>(bm.createAnnotatedType(CircuitBreaker.class)));
         bbd.addInterceptorBinding(new HystrixInterceptorBindingAnnotatedType<>(bm.createAnnotatedType(Retry.class)));
-        bbd.addInterceptorBinding(new HystrixInterceptorBindingAnnotatedType<>(bm.createAnnotatedType(TimeOut.class)));
+        bbd.addInterceptorBinding(new HystrixInterceptorBindingAnnotatedType<>(bm.createAnnotatedType(Timeout.class)));
         bbd.addInterceptorBinding(new HystrixInterceptorBindingAnnotatedType<>(bm.createAnnotatedType(Asynchronous.class)));
         bbd.addInterceptorBinding(new HystrixInterceptorBindingAnnotatedType<>(bm.createAnnotatedType(Fallback.class)));
     }
@@ -57,4 +66,58 @@ public class HystrixExtension implements Extension {
     private Set<Method> asyncMethods = new HashSet<>();*/
 
 
+    /**
+     * @author Antoine Sabot-Durand
+     */
+    public static class HystrixInterceptorBindingAnnotatedType<T extends Annotation> implements AnnotatedType<T> {
+
+        public HystrixInterceptorBindingAnnotatedType(AnnotatedType<T> delegate) {
+            this.delegate = delegate;
+            annotations = new HashSet<>(delegate.getAnnotations());
+            annotations.add(HystrixCommandBinding.Literal.INSTANCE);
+        }
+
+        public Class<T> getJavaClass() {
+            return delegate.getJavaClass();
+        }
+
+        public Set<AnnotatedConstructor<T>> getConstructors() {
+            return delegate.getConstructors();
+        }
+
+        public Set<AnnotatedMethod<? super T>> getMethods() {
+            return delegate.getMethods();
+        }
+
+        public Set<AnnotatedField<? super T>> getFields() {
+            return delegate.getFields();
+        }
+
+        public Type getBaseType() {
+            return delegate.getBaseType();
+        }
+
+        public Set<Type> getTypeClosure() {
+            return delegate.getTypeClosure();
+        }
+
+        public <S extends Annotation> S getAnnotation(Class<S> annotationType) {
+            if (HystrixCommandBinding.class.equals(annotationType)) {
+                return (S) HystrixCommandBinding.Literal.INSTANCE;
+            }
+            return delegate.getAnnotation(annotationType);
+        }
+
+        public Set<Annotation> getAnnotations() {
+            return annotations;
+        }
+
+        public boolean isAnnotationPresent(Class<? extends Annotation> annotationType) {
+            return HystrixCommandBinding.class.equals(annotationType) || delegate.isAnnotationPresent(annotationType);
+        }
+
+        private AnnotatedType<T> delegate;
+
+        private Set<Annotation> annotations;
+    }
 }

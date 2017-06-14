@@ -22,7 +22,7 @@ import javax.enterprise.context.ApplicationScoped;
 
 import org.eclipse.microprofile.fault.tolerance.inject.Asynchronous;
 import org.eclipse.microprofile.fault.tolerance.inject.Fallback;
-import org.eclipse.microprofile.fault.tolerance.inject.TimeOut;
+import org.eclipse.microprofile.fault.tolerance.inject.Timeout;
 
 
 /**
@@ -32,7 +32,7 @@ import org.eclipse.microprofile.fault.tolerance.inject.TimeOut;
 public class MyMicroservice {
 
     @Asynchronous
-    @TimeOut(timeOutUnit = ChronoUnit.SECONDS, timeOut = 7)
+    @Timeout(value = 7, unit = ChronoUnit.SECONDS)
     //@Fallback(handler = MyFallbackHandler.class)
     public Object sayHello() {
         try {
@@ -44,8 +44,8 @@ public class MyMicroservice {
     }
 
     @Asynchronous
-    @TimeOut(timeOutUnit = ChronoUnit.SECONDS, timeOut = 7)
-    @Fallback(handler = MyFallbackHandler.class)
+    @Timeout(value = 7, unit = ChronoUnit.SECONDS)
+    @Fallback(MyFallbackHandler.class)
     public Object sayHelloWithFailback() {
         try {
             Thread.sleep(5000);

@@ -19,6 +19,7 @@ package org.wildfly.swarm.microprofile.fault.tolerance.hystrix;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.time.Duration;
+import java.util.function.Supplier;
 
 import javax.annotation.Priority;
 import javax.interceptor.AroundInvoke;
@@ -32,7 +33,7 @@ import org.eclipse.microprofile.fault.tolerance.inject.CircuitBreaker;
 import org.eclipse.microprofile.fault.tolerance.inject.Fallback;
 import org.eclipse.microprofile.fault.tolerance.inject.FallbackHandler;
 import org.eclipse.microprofile.fault.tolerance.inject.Retry;
-import org.eclipse.microprofile.fault.tolerance.inject.TimeOut;
+import org.eclipse.microprofile.fault.tolerance.inject.Timeout;
 
 import static com.netflix.hystrix.HystrixCommand.Setter;
 
@@ -48,33 +49,31 @@ public class HystrixCommandInterceptor {
 
 
     @AroundInvoke
-    public Object timeMethod(InvocationContext ic) throws Exception {
+    public Object interceptCommand(InvocationContext ic) throws Exception {
 
         Method method = ic.getMethod();
         ExecutionContextWithInvocationContext ec = new ExecutionContextWithInvocationContext(ic);
         Asynchronous async = getAnnotation(method, Asynchronous.class);
-        TimeOut timeout = getAnnotation(method, TimeOut.class);
+        Timeout Timeout = getAnnotation(method, Timeout.class);
         CircuitBreaker circuitBreaker = getAnnotation(method, CircuitBreaker.class);
         Retry retry = getAnnotation(method, Retry.class);
         Fallback fallback = getAnnotation(method, Fallback.class);
         HystrixCommandProperties.Setter setter = HystrixCommandProperties.Setter();
+        Supplier fallbackToRun = null;
 
-        if (timeout != null) {
-            long timeoutmillis = Duration.of(timeout.timeOut(), timeout.timeOutUnit()).toMillis();
-            setter = setter.withExecutionTimeoutInMilliseconds((int) timeoutmillis);
+        if (Timeout != null) {
+            long Timeoutmillis = Duration.of(Timeout.value(), Timeout.unit()).toMillis();
+            setter = setter.withExecutionTimeoutInMilliseconds((int) Timeoutmillis);
+        }
+
+        if (fallback != null) {
+            FallbackHandler fbh = fallback.value().newInstance();
+            fallbackToRun = (() -> fbh.handle(ec));
         }
 
         DefaultCommand command = new DefaultCommand(Setter
                                                             .withGroupKey(HystrixCommandGroupKey.Factory.asKey("DefaultCommandGroup"))
-                                                            .andCommandPropertiesDefaults(setter));
-
-        command.setToRun(ec::proceed);
-
-
-        if (fallback != null) {
-            FallbackHandler fbh = fallback.handler().newInstance();
-            command.setFallback(() -> fbh.handle(ec));
-        }
+                                                            .andCommandPropertiesDefaults(setter), ec::proceed, fallbackToRun);
 
         if (async != null) {
             return command.queue();

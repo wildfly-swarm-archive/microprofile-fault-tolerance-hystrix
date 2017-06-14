@@ -14,18 +14,17 @@
  * limitations under the License.
  */
 
-package org.wildfly.swarm.microprofile.fault.tolerance.hystrix.literal;
+package org.wildfly.swarm.microprofile.fault.tolerance.hystrix.extension;
 
 import javax.enterprise.util.AnnotationLiteral;
-
-import org.eclipse.microprofile.fault.tolerance.inject.Asynchronous;
-
+import javax.enterprise.util.Nonbinding;
 
 /**
  * @author Antoine Sabot-Durand
  */
-public class AsynchronousLiteral extends AnnotationLiteral<Asynchronous> implements Asynchronous {
+public class NonbindingLiteral extends AnnotationLiteral<Nonbinding> implements Nonbinding {
 
-    public static Asynchronous INSTANCE = new AsynchronousLiteral();
+    public static final Nonbinding INSTANCE = new NonbindingLiteral();
 
+    private static final long serialVersionUID = 1L;
 }

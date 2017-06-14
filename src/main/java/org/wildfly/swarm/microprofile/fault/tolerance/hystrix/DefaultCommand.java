@@ -18,46 +18,18 @@ package org.wildfly.swarm.microprofile.fault.tolerance.hystrix;
 
 import java.util.function.Supplier;
 
-import com.netflix.hystrix.HystrixCommandGroupKey;
-import com.netflix.hystrix.HystrixThreadPoolKey;
-
 /**
  * @author Antoine Sabot-Durand
  */
 public class DefaultCommand<R> extends com.netflix.hystrix.HystrixCommand<R> {
 
 
-    public DefaultCommand() {
-        this(HystrixCommandGroupKey.Factory.asKey("test"));
-    }
-
-    protected DefaultCommand(HystrixCommandGroupKey group) {
-        super(group);
-    }
-
-    protected DefaultCommand(HystrixCommandGroupKey group, HystrixThreadPoolKey threadPool) {
-        super(group, threadPool);
-    }
-
-    protected DefaultCommand(HystrixCommandGroupKey group, int executionIsolationThreadTimeoutInMilliseconds) {
-        super(group, executionIsolationThreadTimeoutInMilliseconds);
-    }
-
-    protected DefaultCommand(HystrixCommandGroupKey group, HystrixThreadPoolKey threadPool, int executionIsolationThreadTimeoutInMilliseconds) {
-        super(group, threadPool, executionIsolationThreadTimeoutInMilliseconds);
-    }
-
-    protected DefaultCommand(Setter setter) {
+    protected DefaultCommand(Setter setter, Supplier<R> toRun, Supplier<R> fallback) {
         super(setter);
-    }
-
-    public Supplier<R> getToRun() {
-        return toRun;
-    }
-
-    public void setToRun(Supplier<R> toRun) {
         this.toRun = toRun;
+        this.fallback = fallback;
     }
+
 
     @Override
     protected R run() throws Exception {
@@ -72,11 +44,8 @@ public class DefaultCommand<R> extends com.netflix.hystrix.HystrixCommand<R> {
         return fallback.get();
     }
 
-    public void setFallback(Supplier<R> fallback) {
-        this.fallback = fallback;
-    }
 
-    private Supplier<R> fallback = null;
+    private final Supplier<R> fallback;
 
-    private Supplier<R> toRun = null;
+    private final Supplier<R> toRun;
 }
