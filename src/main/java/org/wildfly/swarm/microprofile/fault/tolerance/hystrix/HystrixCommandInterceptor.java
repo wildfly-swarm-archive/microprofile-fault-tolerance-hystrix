@@ -26,21 +26,19 @@ import java.util.function.Supplier;
 import javax.annotation.Priority;
 import javax.enterprise.inject.spi.BeanManager;
 import javax.enterprise.inject.spi.Unmanaged;
-import javax.enterprise.inject.spi.Unmanaged.UnmanagedInstance;
 import javax.inject.Inject;
 import javax.interceptor.AroundInvoke;
 import javax.interceptor.Interceptor;
 import javax.interceptor.InvocationContext;
 
-import org.eclipse.microprofile.fault.tolerance.inject.Asynchronous;
-import org.eclipse.microprofile.fault.tolerance.inject.Fallback;
-import org.eclipse.microprofile.fault.tolerance.inject.FallbackHandler;
-import org.eclipse.microprofile.fault.tolerance.inject.Timeout;
-
 import com.netflix.hystrix.HystrixCommand.Setter;
 import com.netflix.hystrix.HystrixCommandGroupKey;
 import com.netflix.hystrix.HystrixCommandKey;
 import com.netflix.hystrix.HystrixCommandProperties;
+import org.eclipse.microprofile.faulttolerance.Asynchronous;
+import org.eclipse.microprofile.faulttolerance.Fallback;
+import org.eclipse.microprofile.faulttolerance.FallbackHandler;
+import org.eclipse.microprofile.faulttolerance.Timeout;
 
 /**
  * @author Antoine Sabot-Durand
@@ -50,11 +48,6 @@ import com.netflix.hystrix.HystrixCommandProperties;
 @HystrixCommandBinding
 @Priority(Interceptor.Priority.LIBRARY_AFTER + 1)
 public class HystrixCommandInterceptor {
-
-    @Inject
-    private BeanManager beanManager;
-
-    private final Map<Method, CommandMetadata> commandMetadataMap = new ConcurrentHashMap<>();
 
     @AroundInvoke
     public Object interceptCommand(InvocationContext ic) throws Exception {
@@ -69,7 +62,7 @@ public class HystrixCommandInterceptor {
         CommandMetadata metadata = commandMetadataMap.computeIfAbsent(method, (key) -> new CommandMetadata(key));
 
         Supplier<Object> fallback = metadata.hasFallback() ? () -> {
-            UnmanagedInstance<FallbackHandler<?>> unmanagedInstance = metadata.unmanaged.newInstance();
+            Unmanaged.UnmanagedInstance<FallbackHandler<?>> unmanagedInstance = metadata.unmanaged.newInstance();
             FallbackHandler<?> handler = unmanagedInstance.produce().inject().postConstruct().get();
             try {
                 return handler.handle(ctx);
@@ -98,23 +91,6 @@ public class HystrixCommandInterceptor {
         return null;
     }
 
-    private class CommandMetadata {
-
-        private final Setter setter;
-
-        private final Unmanaged<FallbackHandler<?>> unmanaged;
-
-        public CommandMetadata(Method method) {
-            this.setter = initSetter(method);
-            this.unmanaged = initUnmanaged(method);
-        }
-
-        boolean hasFallback() {
-            return unmanaged != null;
-        }
-
-    }
-
     @SuppressWarnings("unchecked")
     private Unmanaged<FallbackHandler<?>> initUnmanaged(Method method) {
         Fallback fallback = getAnnotation(method, Fallback.class);
@@ -137,6 +113,28 @@ public class HystrixCommandInterceptor {
                 // Each method must have a unique command key
                 .andCommandKey(HystrixCommandKey.Factory.asKey(method.getDeclaringClass().getName() + method.toString()))
                 .andCommandPropertiesDefaults(propertiesSetter);
+    }
+
+    private final Map<Method, CommandMetadata> commandMetadataMap = new ConcurrentHashMap<>();
+
+    @Inject
+    private BeanManager beanManager;
+
+    private class CommandMetadata {
+
+        public CommandMetadata(Method method) {
+            setter = initSetter(method);
+            unmanaged = initUnmanaged(method);
+        }
+
+        boolean hasFallback() {
+            return unmanaged != null;
+        }
+
+        private final Setter setter;
+
+        private final Unmanaged<FallbackHandler<?>> unmanaged;
+
     }
 
 }
