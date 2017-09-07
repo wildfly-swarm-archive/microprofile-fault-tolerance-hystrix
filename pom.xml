@@ -40,7 +40,7 @@
 
   <dependencies>
     <dependency>
-      <groupId>org.eclipse.microprofile.fault.tolerance</groupId>
+      <groupId>org.eclipse.microprofile.fault-tolerance</groupId>
       <artifactId>microprofile-fault-tolerance-api</artifactId>
       <version>${version.microprofile-fault-tolerance-api}</version>
     </dependency>
