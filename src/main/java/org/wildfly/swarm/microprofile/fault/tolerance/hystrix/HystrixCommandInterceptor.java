@@ -35,11 +35,13 @@ import com.netflix.hystrix.HystrixCommand.Setter;
 import com.netflix.hystrix.HystrixCommandGroupKey;
 import com.netflix.hystrix.HystrixCommandKey;
 import com.netflix.hystrix.HystrixCommandProperties;
+import com.netflix.hystrix.exception.HystrixRuntimeException;
 import org.eclipse.microprofile.faulttolerance.Asynchronous;
 import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
 import org.eclipse.microprofile.faulttolerance.Fallback;
 import org.eclipse.microprofile.faulttolerance.FallbackHandler;
 import org.eclipse.microprofile.faulttolerance.Timeout;
+import org.eclipse.microprofile.faulttolerance.exceptions.TimeoutException;
 
 /**
  * @author Antoine Sabot-Durand
@@ -52,6 +54,7 @@ public class HystrixCommandInterceptor {
 
     @AroundInvoke
     public Object interceptCommand(InvocationContext ic) throws Exception {
+
 
         Method method = ic.getMethod();
         ExecutionContextWithInvocationContext ctx = new ExecutionContextWithInvocationContext(ic);
@@ -75,11 +78,20 @@ public class HystrixCommandInterceptor {
         DefaultCommand command = new DefaultCommand(metadata.setter, ctx::proceed, fallback);
 
         Asynchronous async = getAnnotation(method, Asynchronous.class);
-        if (async != null) {
-            return command.queue();
-        } else {
-            return command.execute();
+        Object res = null;
+        try {
+            if (async != null) {
+                res = command.queue();
+            } else {
+                res = command.execute();
+            }
+        } catch (HystrixRuntimeException e) {
+            if (e.getFailureType().equals(HystrixRuntimeException.FailureType.TIMEOUT))
+                throw new TimeoutException(e);
+            else
+                throw new RuntimeException(e);
         }
+        return res;
     }
 
     private <T extends Annotation> T getAnnotation(Method method, Class<T> annotation) {
