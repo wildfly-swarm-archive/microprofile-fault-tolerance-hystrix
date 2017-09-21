@@ -16,7 +16,13 @@
 
 package org.wildfly.swarm.microprofile.fault.tolerance.hystrix;
 
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.function.Supplier;
+
+
 
 /**
  * @author Antoine Sabot-Durand
@@ -24,20 +30,52 @@ import java.util.function.Supplier;
 public class DefaultCommand extends com.netflix.hystrix.HystrixCommand<Object> {
 
     /**
-     *
      * @param setter
      * @param toRun
      * @param fallback
      */
-    protected DefaultCommand(Setter setter, Supplier<Object> toRun, Supplier<Object> fallback) {
+    protected DefaultCommand(Setter setter, Supplier<Object> toRun, Supplier<Object> fallback, RetryInfo retry) {
         super(setter);
         this.toRun = toRun;
         this.fallback = fallback;
+        this.retry = retry;
     }
 
     @Override
     protected Object run() throws Exception {
-        return toRun.get();
+        Object res = null;
+        int maxExecNumber = 1;
+        long maxDuration = 0;
+        Long start = System.nanoTime();
+        List<? super Throwable> abortOn = new ArrayList<>();
+        List<? super Throwable> retryOn = new ArrayList<>();
+        if (retry != null) {
+
+            maxExecNumber = retry.getMaxRetries() + 1;
+            maxDuration = Duration.of(retry.getMaxDuration(), retry.getDurationUnit()).toNanos();
+            abortOn = Arrays.asList(retry.getAbortOn());
+            retryOn = Arrays.asList(retry.getRetryOn());
+            //TODO: test maxExecNumber >= -1
+            //TODO: what happen when equal 0?
+        }
+
+        while (maxExecNumber >= 1) {
+            maxExecNumber--;
+
+            try {
+                res = toRun.get();
+                maxExecNumber = 0;
+            } catch (Exception e) {
+                if (maxExecNumber > 0 && System.nanoTime() - start <= maxDuration) {
+                    //TODO:add retry options
+                    continue;
+                } else {
+                    throw e;
+                }
+            }
+        }
+
+        return res;
     }
 
     @Override
@@ -52,4 +90,6 @@ public class DefaultCommand extends com.netflix.hystrix.HystrixCommand<Object> {
     private final Supplier<Object> fallback;
 
     private final Supplier<Object> toRun;
+
+    private final RetryInfo retry;
 }

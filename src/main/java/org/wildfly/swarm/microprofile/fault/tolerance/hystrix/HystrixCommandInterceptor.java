@@ -40,6 +40,7 @@ import org.eclipse.microprofile.faulttolerance.Asynchronous;
 import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
 import org.eclipse.microprofile.faulttolerance.Fallback;
 import org.eclipse.microprofile.faulttolerance.FallbackHandler;
+import org.eclipse.microprofile.faulttolerance.Retry;
 import org.eclipse.microprofile.faulttolerance.Timeout;
 import org.eclipse.microprofile.faulttolerance.exceptions.TimeoutException;
 
@@ -59,8 +60,10 @@ public class HystrixCommandInterceptor {
         Method method = ic.getMethod();
         ExecutionContextWithInvocationContext ctx = new ExecutionContextWithInvocationContext(ic);
 
-        // TODO
-        // Retry retry = getAnnotation(method, Retry.class);
+        Object res = null;
+
+        Retry retryAnnotation = getAnnotation(method, Retry.class);
+        RetryInfo retry = retryAnnotation == null ? null : new RetryInfo(retryAnnotation);
 
         CommandMetadata metadata = commandMetadataMap.computeIfAbsent(method, (key) -> new CommandMetadata(key));
 
@@ -75,10 +78,11 @@ public class HystrixCommandInterceptor {
             }
         } : null;
 
-        DefaultCommand command = new DefaultCommand(metadata.setter, ctx::proceed, fallback);
+        DefaultCommand command = new DefaultCommand(metadata.setter, ctx::proceed, fallback, retry);
 
         Asynchronous async = getAnnotation(method, Asynchronous.class);
-        Object res = null;
+
+
         try {
             if (async != null) {
                 res = command.queue();
@@ -91,6 +95,7 @@ public class HystrixCommandInterceptor {
             else
                 throw new RuntimeException(e);
         }
+
         return res;
     }
 
