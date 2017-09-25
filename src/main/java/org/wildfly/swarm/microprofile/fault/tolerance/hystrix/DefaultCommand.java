@@ -17,11 +17,8 @@
 package org.wildfly.swarm.microprofile.fault.tolerance.hystrix;
 
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.function.Supplier;
-
 
 
 /**
@@ -46,17 +43,13 @@ public class DefaultCommand extends com.netflix.hystrix.HystrixCommand<Object> {
         Object res = null;
         int maxExecNumber = 1;
         long maxDuration = 0;
+        long delay = 0;
         Long start = System.nanoTime();
-        List<? super Throwable> abortOn = new ArrayList<>();
-        List<? super Throwable> retryOn = new ArrayList<>();
-        if (retry != null) {
 
+        if (retry != null) {
             maxExecNumber = retry.getMaxRetries() + 1;
             maxDuration = Duration.of(retry.getMaxDuration(), retry.getDurationUnit()).toNanos();
-            abortOn = Arrays.asList(retry.getAbortOn());
-            retryOn = Arrays.asList(retry.getRetryOn());
-            //TODO: test maxExecNumber >= -1
-            //TODO: what happen when equal 0?
+            delay = Duration.of(retry.getDelay(), retry.getDelayUnit()).toMillis();
         }
 
         while (maxExecNumber >= 1) {
@@ -66,8 +59,14 @@ public class DefaultCommand extends com.netflix.hystrix.HystrixCommand<Object> {
                 res = toRun.get();
                 maxExecNumber = 0;
             } catch (Exception e) {
-                if (maxExecNumber > 0 && System.nanoTime() - start <= maxDuration) {
-                    //TODO:add retry options
+                if (Arrays.stream(retry.getAbortOn()).noneMatch(ex -> ex.isAssignableFrom(e.getClass()))
+                        && (retry.getRetryOn().length == 0 || Arrays.stream(retry.getRetryOn()).anyMatch(ex -> ex.isAssignableFrom(e.getClass())))
+                        && maxExecNumber > 0
+                        && System.nanoTime() - start <= maxDuration) {
+                    if (delay > 0) {
+                        long jitter = (long) (Math.random() * ((retry.getJitter() * 2) + 1)) - retry.getJitter(); // random number between -jitter and +jitter
+                        Thread.sleep(delay + Duration.of(jitter, retry.getJitterDelayUnit()).toMillis());
+                    }
                     continue;
                 } else {
                     throw e;
@@ -85,7 +84,6 @@ public class DefaultCommand extends com.netflix.hystrix.HystrixCommand<Object> {
         }
         return fallback.get();
     }
-
 
     private final Supplier<Object> fallback;
 

@@ -90,8 +90,10 @@ public class HystrixCommandInterceptor {
                 res = command.execute();
             }
         } catch (HystrixRuntimeException e) {
-            if (e.getFailureType().equals(HystrixRuntimeException.FailureType.TIMEOUT))
+            if (e.getFailureType().equals(HystrixRuntimeException.FailureType.TIMEOUT)) {
+                //TODO: if @Retry, command should be run again
                 throw new TimeoutException(e);
+            }
             else
                 throw new RuntimeException(e);
         }
@@ -126,6 +128,8 @@ public class HystrixCommandInterceptor {
         if (timeout != null) {
             // TODO: In theory a user might specify a long value
             propertiesSetter.withExecutionTimeoutInMilliseconds((int) Duration.of(timeout.value(), timeout.unit()).toMillis());
+        } else {
+            propertiesSetter.withExecutionTimeoutEnabled(false);
         }
 
         if (circuitBreaker != null) {

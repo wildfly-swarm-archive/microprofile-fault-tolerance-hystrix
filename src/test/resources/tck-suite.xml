@@ -22,12 +22,14 @@
 
 
     <classes>
-
       <class name="org.eclipse.microprofile.fault.tolerance.tck.TimeoutTest"/>
+      <class name="org.eclipse.microprofile.fault.tolerance.tck.RetryTest"/>
+      <class name="org.eclipse.microprofile.fault.tolerance.tck.RetryConditionTest"/>
 
-      <class name="org.eclipse.microprofile.fault.tolerance.tck.RetryTest" />
-      <!--<class name="org.eclipse.microprofile.fault.tolerance.tck.CircuitBreakerTest" />-->
+      <!--<class name="org.eclipse.microprofile.fault.tolerance.tck.RetryTimeoutTest"/>-->
       <!--<class name="org.eclipse.microprofile.fault.tolerance.tck.FallbackTest" />-->
+      <!--<class name="org.eclipse.microprofile.fault.tolerance.tck.CircuitBreakerTest" />-->
+
     </classes>
 
     <!--<packages>
