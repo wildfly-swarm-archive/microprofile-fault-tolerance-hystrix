@@ -31,49 +31,50 @@ public class DefaultCommand extends com.netflix.hystrix.HystrixCommand<Object> {
      * @param toRun
      * @param fallback
      */
-    protected DefaultCommand(Setter setter, Supplier<Object> toRun, Supplier<Object> fallback, RetryInfo retry) {
+    protected DefaultCommand(Setter setter, Supplier<Object> toRun, Supplier<Object> fallback, RetryContext retryContext) {
         super(setter);
         this.toRun = toRun;
         this.fallback = fallback;
-        this.retry = retry;
+        this.retryContext = retryContext;
+
     }
 
     @Override
     protected Object run() throws Exception {
         Object res = null;
-        int maxExecNumber = 1;
-        long maxDuration = 0;
-        long delay = 0;
-        Long start = System.nanoTime();
-
-        if (retry != null) {
-            maxExecNumber = retry.getMaxRetries() + 1;
-            maxDuration = Duration.of(retry.getMaxDuration(), retry.getDurationUnit()).toNanos();
-            delay = Duration.of(retry.getDelay(), retry.getDelayUnit()).toMillis();
-        }
-
-        while (maxExecNumber >= 1) {
-            maxExecNumber--;
-
-            try {
-                res = toRun.get();
-                maxExecNumber = 0;
-            } catch (Exception e) {
-                if (Arrays.stream(retry.getAbortOn()).noneMatch(ex -> ex.isAssignableFrom(e.getClass()))
-                        && (retry.getRetryOn().length == 0 || Arrays.stream(retry.getRetryOn()).anyMatch(ex -> ex.isAssignableFrom(e.getClass())))
-                        && maxExecNumber > 0
-                        && System.nanoTime() - start <= maxDuration) {
-                    if (delay > 0) {
-                        long jitter = (long) (Math.random() * ((retry.getJitter() * 2) + 1)) - retry.getJitter(); // random number between -jitter and +jitter
-                        Thread.sleep(delay + Duration.of(jitter, retry.getJitterDelayUnit()).toMillis());
+        boolean notExecuted = true;
+        if (retryContext == null) {
+            res = basicRun();
+        } else {
+            while (notExecuted && retryContext.shouldRetry()) {
+                retryContext.doRetry();
+                try {
+                    res = basicRun();
+                    notExecuted = false;
+                } catch (Exception e) {
+                    if (Arrays.stream(retryContext.getAbortOn()).noneMatch(ex -> ex.isAssignableFrom(e.getClass()))
+                            && (retryContext.getRetryOn().length == 0 || Arrays.stream(retryContext.getRetryOn()).anyMatch(ex -> ex.isAssignableFrom(e.getClass())))
+                            && retryContext.shouldRetry()
+                            && System.nanoTime() - retryContext.getStart() <= retryContext.getMaxDuration()) {
+                        Long jitterBase = retryContext.get(RetryContext.JITTER,Long.class);
+                        if (retryContext.getDelay() > 0) {
+                            long jitter = (long) (Math.random() * ((jitterBase * 2) + 1)) - jitterBase; // random number between -jitter and +jitter
+                            Thread.sleep(retryContext.getDelay() + Duration.of(jitter, retryContext.get(RetryContext.JITTER_DELAY_UNIT)).toMillis());
+                        }
+                        continue;
+                    } else {
+                        throw e;
                     }
-                    continue;
-                } else {
-                    throw e;
                 }
             }
         }
 
+        return res;
+    }
+
+    private Object basicRun() {
+        Object res;
+        res = toRun.get();
         return res;
     }
 
@@ -85,9 +86,12 @@ public class DefaultCommand extends com.netflix.hystrix.HystrixCommand<Object> {
         return fallback.get();
     }
 
+
     private final Supplier<Object> fallback;
 
     private final Supplier<Object> toRun;
 
-    private final RetryInfo retry;
+    private final RetryContext retryContext;
+
+
 }

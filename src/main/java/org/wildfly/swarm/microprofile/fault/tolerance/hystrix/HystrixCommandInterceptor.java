@@ -17,6 +17,7 @@
 package org.wildfly.swarm.microprofile.fault.tolerance.hystrix;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.Map;
@@ -24,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 import javax.annotation.Priority;
+import javax.enterprise.inject.Intercepted;
 import javax.enterprise.inject.spi.BeanManager;
 import javax.enterprise.inject.spi.Unmanaged;
 import javax.inject.Inject;
@@ -42,6 +44,7 @@ import org.eclipse.microprofile.faulttolerance.Fallback;
 import org.eclipse.microprofile.faulttolerance.FallbackHandler;
 import org.eclipse.microprofile.faulttolerance.Retry;
 import org.eclipse.microprofile.faulttolerance.Timeout;
+import org.eclipse.microprofile.faulttolerance.exceptions.FaultToleranceException;
 import org.eclipse.microprofile.faulttolerance.exceptions.TimeoutException;
 
 /**
@@ -53,21 +56,21 @@ import org.eclipse.microprofile.faulttolerance.exceptions.TimeoutException;
 @Priority(Interceptor.Priority.LIBRARY_AFTER + 1)
 public class HystrixCommandInterceptor {
 
+
     @AroundInvoke
     public Object interceptCommand(InvocationContext ic) throws Exception {
 
 
         Method method = ic.getMethod();
-        ExecutionContextWithInvocationContext ctx = new ExecutionContextWithInvocationContext(ic);
+        ctx = new ExecutionContextWithInvocationContext(ic);
 
+        boolean shouldRunCommand = true;
         Object res = null;
 
-        Retry retryAnnotation = getAnnotation(method, Retry.class);
-        RetryInfo retry = retryAnnotation == null ? null : new RetryInfo(retryAnnotation);
 
-        CommandMetadata metadata = commandMetadataMap.computeIfAbsent(method, (key) -> new CommandMetadata(key));
+        CommandMetadata metadata = commandMetadataMap.computeIfAbsent(method, CommandMetadata::new);
 
-        Supplier<Object> fallback = metadata.hasFallback() ? () -> {
+        Supplier<Object> fallback = metadata.hasFallbackClass() ? () -> {
             Unmanaged.UnmanagedInstance<FallbackHandler<?>> unmanagedInstance = metadata.unmanaged.newInstance();
             FallbackHandler<?> handler = unmanagedInstance.produce().inject().postConstruct().get();
             try {
@@ -76,26 +79,34 @@ public class HystrixCommandInterceptor {
                 // The instance exists to service a single invocation only
                 unmanagedInstance.preDestroy().dispose();
             }
-        } : null;
+        } : metadata.fallbackSupplier;
 
-        DefaultCommand command = new DefaultCommand(metadata.setter, ctx::proceed, fallback, retry);
 
         Asynchronous async = getAnnotation(method, Asynchronous.class);
 
+        while (shouldRunCommand) {
+            shouldRunCommand = false;
+            DefaultCommand command = new DefaultCommand(metadata.setter, ctx::proceed, fallback, metadata.retryContext);
 
-        try {
-            if (async != null) {
-                res = command.queue();
-            } else {
-                res = command.execute();
+
+            try {
+                if (async != null) {
+                    res = command.queue();
+                } else {
+                    res = command.execute();
+                }
+            } catch (HystrixRuntimeException e) {
+                if (e.getFailureType().equals(HystrixRuntimeException.FailureType.TIMEOUT)) {
+                    if (metadata.retryContext != null && metadata.retryContext.getMaxExecNumber() > 0) {
+                        //retry.incMaxNumberExec();
+                        shouldRunCommand = true;
+                        continue;
+                    }
+                    throw new TimeoutException(e);
+                } else {
+                    throw new RuntimeException(e);
+                }
             }
-        } catch (HystrixRuntimeException e) {
-            if (e.getFailureType().equals(HystrixRuntimeException.FailureType.TIMEOUT)) {
-                //TODO: if @Retry, command should be run again
-                throw new TimeoutException(e);
-            }
-            else
-                throw new RuntimeException(e);
         }
 
         return res;
@@ -125,18 +136,22 @@ public class HystrixCommandInterceptor {
         Timeout timeout = getAnnotation(method, Timeout.class);
         CircuitBreaker circuitBreaker = getAnnotation(method, CircuitBreaker.class);
 
+
         if (timeout != null) {
             // TODO: In theory a user might specify a long value
-            propertiesSetter.withExecutionTimeoutInMilliseconds((int) Duration.of(timeout.value(), timeout.unit()).toMillis());
+            TimeoutConfig config = new TimeoutConfig(timeout, method);
+            propertiesSetter.withExecutionTimeoutInMilliseconds((int) Duration.of(config.get(TimeoutConfig.VALUE), config.get(TimeoutConfig.UNIT)).toMillis());
         } else {
             propertiesSetter.withExecutionTimeoutEnabled(false);
         }
 
         if (circuitBreaker != null) {
+
+            CircuitBreakerConfig conf = new CircuitBreakerConfig(circuitBreaker, method);
             propertiesSetter.withCircuitBreakerEnabled(true)
-                    .withCircuitBreakerRequestVolumeThreshold(circuitBreaker.requestVolumeThreshold())
-                    .withCircuitBreakerErrorThresholdPercentage(new Double(circuitBreaker.failureRatio() * 100).intValue())
-                    .withCircuitBreakerSleepWindowInMilliseconds((int) Duration.of(circuitBreaker.delay(), circuitBreaker.delayUnit()).toMillis());
+                    .withCircuitBreakerRequestVolumeThreshold(conf.get(CircuitBreakerConfig.REQUEST_VOLUME_THRESHOLD))
+                    .withCircuitBreakerErrorThresholdPercentage(new Double((Double) conf.get(CircuitBreakerConfig.FAILURE_RATIO) * 100).intValue())
+                    .withCircuitBreakerSleepWindowInMilliseconds((int) Duration.of(conf.get(CircuitBreakerConfig.DELAY), conf.get(CircuitBreakerConfig.DELAY_UNIT)).toMillis());
         } else {
             propertiesSetter.withCircuitBreakerEnabled(false);
         }
@@ -149,6 +164,8 @@ public class HystrixCommandInterceptor {
 
     private final Map<Method, CommandMetadata> commandMetadataMap = new ConcurrentHashMap<>();
 
+    private ExecutionContextWithInvocationContext ctx;
+
     @Inject
     private BeanManager beanManager;
 
@@ -156,16 +173,56 @@ public class HystrixCommandInterceptor {
 
         public CommandMetadata(Method method) {
             setter = initSetter(method);
-            unmanaged = initUnmanaged(method);
+
+            Fallback fallback = getAnnotation(method, Fallback.class);
+
+            if (fallback != null) {
+                if (!fallback.value().equals(Fallback.DEFAULT.class)) {
+                    unmanaged = initUnmanaged(method);
+                } else {
+                    unmanaged = null;
+                    if (!"".equals(fallback.fallbackMethod())) {
+                        try {
+                            fallbackMethod = method.getDeclaringClass().getMethod(fallback.fallbackMethod(),method.getParameterTypes());
+                        } catch (NoSuchMethodException e) {
+                            throw new FaultToleranceException("Fallback method not found", e);
+                        }
+                        fallbackSupplier = () -> {
+                            try {
+                                return fallbackMethod.invoke(ctx.getTarget(),ctx.getParameters());
+                            } catch ( IllegalAccessException | InvocationTargetException e) {
+                                throw new FaultToleranceException("Error during fallback method invocation", e);
+                            }
+                        };
+
+                    }
+                }
+            } else {
+                unmanaged = null;
+            }
+
+            Retry retry = getAnnotation(method, Retry.class);
+            if (retry != null) {
+                retryContext = new RetryContext(retry, method);
+            } else {
+                retryContext = null;
+            }
+
         }
 
-        boolean hasFallback() {
+        boolean hasFallbackClass() {
             return unmanaged != null;
         }
 
         private final Setter setter;
 
         private final Unmanaged<FallbackHandler<?>> unmanaged;
+
+        private final RetryContext retryContext;
+
+        private Supplier<Object> fallbackSupplier = null;
+
+        private Method fallbackMethod = null;
 
     }
 
