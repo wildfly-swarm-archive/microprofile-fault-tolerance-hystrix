@@ -20,6 +20,8 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.function.Supplier;
 
+import org.wildfly.swarm.microprofile.fault.tolerance.hystrix.config.RetryContext;
+
 
 /**
  * @author Antoine Sabot-Durand

@@ -1,10 +1,16 @@
-package org.wildfly.swarm.microprofile.fault.tolerance.hystrix;
+package org.wildfly.swarm.microprofile.fault.tolerance.hystrix.config;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
+
+import javax.enterprise.inject.spi.Annotated;
+import javax.enterprise.inject.spi.AnnotatedMethod;
+import javax.enterprise.inject.spi.AnnotatedType;
 
 import org.eclipse.microprofile.config.Config;
 import org.eclipse.microprofile.config.ConfigProvider;
@@ -19,7 +25,20 @@ public abstract class GenericConfig<X extends Annotation> {
     public GenericConfig(X annotation, Method method) {
         this.method = method;
         this.annotation = annotation;
+        annotated =null;
     }
+
+    public GenericConfig(X annotation, Annotated annotated) {
+        if(annotated instanceof AnnotatedMethod) {
+            method = ((AnnotatedMethod)annotated).getJavaMember();
+        } else {
+            method = ((AnnotatedType)annotated).getJavaClass().getMethods()[0];
+        }
+        this.annotation =annotation;
+        this.annotated = annotated;
+    }
+
+
 
     public <U> U get(String key, Class<U> expectedType) {
 
@@ -39,7 +58,7 @@ public abstract class GenericConfig<X extends Annotation> {
             if (opt.isPresent()) {
                 return opt.get();
             } else {
-                return getConfigFromAnnotaion(key);
+                return getConfigFromAnnotation(key);
             }
         }
 
@@ -50,7 +69,7 @@ public abstract class GenericConfig<X extends Annotation> {
         if (opt.isPresent()) {
             return opt.get();
         } else {
-            return getConfigFromAnnotaion(key);
+            return getConfigFromAnnotation(key);
         }
 
     }
@@ -60,7 +79,10 @@ public abstract class GenericConfig<X extends Annotation> {
         return get(key, expectedType);
     }
 
-    private <U> U getConfigFromAnnotaion(String key) {
+
+    public abstract void validate();
+
+    private <U> U getConfigFromAnnotation(String key) {
         try {
             return (U) annotation.getClass().getMethod(key).invoke(annotation);
         } catch (IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {
@@ -85,9 +107,10 @@ public abstract class GenericConfig<X extends Annotation> {
 
     protected abstract Map<String, Class<?>> getKeysToType();
 
-    private final Method method;
+    protected final Method method;
 
+    protected final X annotation;
 
-    private final X annotation;
+    protected final Annotated annotated;
 
 }

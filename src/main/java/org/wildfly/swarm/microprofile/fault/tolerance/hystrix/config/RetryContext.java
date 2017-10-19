@@ -1,4 +1,4 @@
-package org.wildfly.swarm.microprofile.fault.tolerance.hystrix;
+package org.wildfly.swarm.microprofile.fault.tolerance.hystrix.config;
 
 import java.lang.reflect.Method;
 import java.time.Duration;
@@ -7,7 +7,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+import javax.enterprise.inject.spi.Annotated;
+
 import org.eclipse.microprofile.faulttolerance.Retry;
+import org.eclipse.microprofile.faulttolerance.exceptions.FaultToleranceDefinitionException;
 
 /**
  * @author Antoine Sabot-Durand
@@ -33,11 +36,34 @@ public class RetryContext extends GenericConfig<Retry> {
 
     public static final String ABORT_ON = "abortOn";
 
-    public RetryContext(Retry r, Method method) {
-        super(r, method);
+    public RetryContext(Retry annotation,Method method) {
+        super(annotation, method);
         setMaxExecNumber((int) get(MAX_RETRIES) + 1);
         setMaxDuration(Duration.of(get(MAX_DURATION), get(DURATION_UNIT)).toNanos());
         setDelay(Duration.of(get(DELAY), get(DELAY_UNIT)).toMillis());
+    }
+
+    public RetryContext(Annotated annotated) {
+        super(annotated.getAnnotation(Retry.class),annotated);
+    }
+
+    @Override
+    public void validate() {
+        if(get(MAX_RETRIES,Integer.class) < -1) {
+            throw new FaultToleranceDefinitionException("Invalid Retry on "+ annotated.toString() +" : maxRetries shouldn't be lower than -1");
+        }
+        if(get(DELAY, Long.class) < 0) {
+            throw new FaultToleranceDefinitionException("Invalid Retry on "+ annotated.toString() +" : delay shouldn't be lower than 0");
+        }
+        if(get(MAX_DURATION, Long.class) < 0) {
+            throw new FaultToleranceDefinitionException("Invalid Retry on "+ annotated.toString() +" : maxDuration shouldn't be lower than 0");
+        }
+        if(get(MAX_DURATION, Long.class) <= get(DELAY, Long.class)) {
+            throw new FaultToleranceDefinitionException("Invalid Retry on "+ annotated.toString() +" : maxDuration should be greater than delay");
+        }
+        if(get(JITTER,Long.class) < 0) {
+            throw new FaultToleranceDefinitionException("Invalid Retry on "+ annotated.toString() +" : jitter shouldn't be lower than 0");
+        }
     }
 
     @Override

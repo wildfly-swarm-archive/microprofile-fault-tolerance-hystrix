@@ -20,8 +20,13 @@
 
   <test name="microprofile-fault-tolerance 1.0 TCK">
 
+    <packages>
+      <package name="org.eclipse.microprofile.fault.tolerance.tck.invalidParameters"/>
+      <package name="org.eclipse.microprofile.fault.tolerance.tck.illegalConfig" />
+    </packages>
 
     <classes>
+
       <class name="org.eclipse.microprofile.fault.tolerance.tck.TimeoutTest"/>
       <class name="org.eclipse.microprofile.fault.tolerance.tck.RetryTest"/>
       <class name="org.eclipse.microprofile.fault.tolerance.tck.RetryConditionTest"/>
@@ -30,20 +35,37 @@
 
 
      <class name="org.eclipse.microprofile.fault.tolerance.tck.FallbackTest">
+       <!--issue with timeout and fallback-->
        <methods>
          <exclude name="testFallbackTimeout"/>
        </methods>
      </class>
 
-      <!-- <class name="org.eclipse.microprofile.fault.tolerance.tck.CircuitBreakerTest"/>
-      <class name="org.eclipse.microprofile.fault.tolerance.tck.CircuitBreakerRetryTest"/>-->
+      <class name="org.eclipse.microprofile.fault.tolerance.tck.CircuitBreakerTest">
+        <!--5 tests out of 7 don't pass-->
+        <methods>
+          <exclude name="testCircuitClosedThenOpen" />
+          <exclude name="testCircuitDefaultSuccessThreshold"/>
+          <exclude name="testCircuitHighSuccessThreshold" />
+          <exclude name="testClassLevelCircuitBase" />
+          <exclude name="testClassLevelCircuitOverride"/>
+          <exclude name="testClassLevelCircuitOverrideNoDelay"/>
+        </methods>
+      </class>
+
+      <class name="org.eclipse.microprofile.fault.tolerance.tck.CircuitBreakerRetryTest">
+        <methods>
+          <exclude name="testCircuitOpenWithMoreRetries"/>
+          <exclude name="testCircuitOpenWithMultiTimeouts"/>
+          <exclude name="testClassLevelCircuitOpenWithMoreRetries"/>
+        </methods>
+      </class>
+
+      <class name="org.eclipse.microprofile.fault.tolerance.tck.bulkhead.BulkheadSynchTest"/>
 
     </classes>
 
-    <!--<packages>
-      <package name="org.eclipse.microprofile.fault.tolerance.tck.*">
-      </package>
-    </packages>-->
+
   </test>
 
 </suite>

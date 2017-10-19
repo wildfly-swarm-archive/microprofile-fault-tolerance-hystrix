@@ -25,7 +25,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 import javax.annotation.Priority;
-import javax.enterprise.inject.Intercepted;
 import javax.enterprise.inject.spi.BeanManager;
 import javax.enterprise.inject.spi.Unmanaged;
 import javax.inject.Inject;
@@ -37,8 +36,10 @@ import com.netflix.hystrix.HystrixCommand.Setter;
 import com.netflix.hystrix.HystrixCommandGroupKey;
 import com.netflix.hystrix.HystrixCommandKey;
 import com.netflix.hystrix.HystrixCommandProperties;
+import com.netflix.hystrix.HystrixThreadPoolProperties;
 import com.netflix.hystrix.exception.HystrixRuntimeException;
 import org.eclipse.microprofile.faulttolerance.Asynchronous;
+import org.eclipse.microprofile.faulttolerance.Bulkhead;
 import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
 import org.eclipse.microprofile.faulttolerance.Fallback;
 import org.eclipse.microprofile.faulttolerance.FallbackHandler;
@@ -46,6 +47,11 @@ import org.eclipse.microprofile.faulttolerance.Retry;
 import org.eclipse.microprofile.faulttolerance.Timeout;
 import org.eclipse.microprofile.faulttolerance.exceptions.FaultToleranceException;
 import org.eclipse.microprofile.faulttolerance.exceptions.TimeoutException;
+import org.wildfly.swarm.microprofile.fault.tolerance.hystrix.config.BulkheadConfig;
+import org.wildfly.swarm.microprofile.fault.tolerance.hystrix.config.CircuitBreakerConfig;
+import org.wildfly.swarm.microprofile.fault.tolerance.hystrix.config.FallbackConfig;
+import org.wildfly.swarm.microprofile.fault.tolerance.hystrix.config.RetryContext;
+import org.wildfly.swarm.microprofile.fault.tolerance.hystrix.config.TimeoutConfig;
 
 /**
  * @author Antoine Sabot-Durand
@@ -104,7 +110,7 @@ public class HystrixCommandInterceptor {
                     }
                     throw new TimeoutException(e);
                 } else {
-                    throw new RuntimeException(e);
+                    throw e;
                 }
             }
         }
@@ -133,9 +139,13 @@ public class HystrixCommandInterceptor {
     private Setter initSetter(Method method) {
         HystrixCommandProperties.Setter propertiesSetter = HystrixCommandProperties.Setter();
 
+        HystrixThreadPoolProperties.Setter threadPoolSetter = HystrixThreadPoolProperties.Setter();
+
         Timeout timeout = getAnnotation(method, Timeout.class);
         CircuitBreaker circuitBreaker = getAnnotation(method, CircuitBreaker.class);
+        Bulkhead bulkhead = getAnnotation(method,Bulkhead.class);
 
+        propertiesSetter.withExecutionIsolationStrategy(HystrixCommandProperties.ExecutionIsolationStrategy.SEMAPHORE);
 
         if (timeout != null) {
             // TODO: In theory a user might specify a long value
@@ -156,10 +166,23 @@ public class HystrixCommandInterceptor {
             propertiesSetter.withCircuitBreakerEnabled(false);
         }
 
+
+        if(bulkhead != null) {
+            BulkheadConfig conf = new BulkheadConfig(bulkhead,method);
+            propertiesSetter.withExecutionIsolationSemaphoreMaxConcurrentRequests(conf.get(BulkheadConfig.VALUE))
+            .withExecutionIsolationThreadInterruptOnFutureCancel(true);
+
+            //threadPoolSetter.withCoreSize(conf.get(BulkheadConfig.VALUE));
+            //threadPoolSetter.withMaximumSize(conf.get(BulkheadConfig.VALUE));
+
+
+        }
+
         return Setter.withGroupKey(HystrixCommandGroupKey.Factory.asKey("DefaultCommandGroup"))
                 // Each method must have a unique command key
                 .andCommandKey(HystrixCommandKey.Factory.asKey(method.getDeclaringClass().getName() + method.toString()))
-                .andCommandPropertiesDefaults(propertiesSetter);
+                .andCommandPropertiesDefaults(propertiesSetter)
+                .andThreadPoolPropertiesDefaults(threadPoolSetter);
     }
 
     private final Map<Method, CommandMetadata> commandMetadataMap = new ConcurrentHashMap<>();
@@ -177,20 +200,21 @@ public class HystrixCommandInterceptor {
             Fallback fallback = getAnnotation(method, Fallback.class);
 
             if (fallback != null) {
-                if (!fallback.value().equals(Fallback.DEFAULT.class)) {
+                FallbackConfig fc = new FallbackConfig(fallback,method);
+                if (!fc.get(FallbackConfig.VALUE).equals(Fallback.DEFAULT.class)) {
                     unmanaged = initUnmanaged(method);
                 } else {
                     unmanaged = null;
-                    if (!"".equals(fallback.fallbackMethod())) {
+                    if (!"".equals(fc.get(FallbackConfig.FALLBACK_METHOD))) {
                         try {
-                            fallbackMethod = method.getDeclaringClass().getMethod(fallback.fallbackMethod(),method.getParameterTypes());
+                            fallbackMethod = method.getDeclaringClass().getMethod(fc.get(FallbackConfig.FALLBACK_METHOD), method.getParameterTypes());
                         } catch (NoSuchMethodException e) {
                             throw new FaultToleranceException("Fallback method not found", e);
                         }
                         fallbackSupplier = () -> {
                             try {
-                                return fallbackMethod.invoke(ctx.getTarget(),ctx.getParameters());
-                            } catch ( IllegalAccessException | InvocationTargetException e) {
+                                return fallbackMethod.invoke(ctx.getTarget(), ctx.getParameters());
+                            } catch (IllegalAccessException | InvocationTargetException e) {
                                 throw new FaultToleranceException("Error during fallback method invocation", e);
                             }
                         };

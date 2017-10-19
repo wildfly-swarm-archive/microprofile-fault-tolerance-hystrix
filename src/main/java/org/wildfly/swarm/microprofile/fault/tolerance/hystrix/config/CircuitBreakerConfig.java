@@ -1,4 +1,4 @@
-package org.wildfly.swarm.microprofile.fault.tolerance.hystrix;
+package org.wildfly.swarm.microprofile.fault.tolerance.hystrix.config;
 
 import java.lang.reflect.Method;
 import java.time.temporal.ChronoUnit;
@@ -6,7 +6,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+import javax.enterprise.inject.spi.Annotated;
+
 import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
+import org.eclipse.microprofile.faulttolerance.exceptions.FaultToleranceDefinitionException;
 
 /**
  * @author Antoine Sabot-Durand
@@ -28,6 +31,26 @@ public class CircuitBreakerConfig extends GenericConfig<CircuitBreaker> {
 
     public CircuitBreakerConfig(CircuitBreaker cb, Method method) {
         super(cb, method);
+    }
+
+    public CircuitBreakerConfig(Annotated a) {
+        super(a.getAnnotation(CircuitBreaker.class),a);
+    }
+
+    @Override
+    public void validate() {
+        if(get(DELAY, Long.class) < 0) {
+            throw new FaultToleranceDefinitionException("Invalid CircuitBreaker on "+ annotated.toString() +" : delay shouldn't be lower than 0");
+        }
+        if(get(REQUEST_VOLUME_THRESHOLD, Integer.class) < 1) {
+            throw new FaultToleranceDefinitionException("Invalid CircuitBreaker on "+ annotated.toString() +" : requestVolumeThreshold shouldn't be lower than 1");
+        }
+        if(get(FAILURE_RATIO, Double.class) < 0 || get(FAILURE_RATIO, Double.class) >1) {
+            throw new FaultToleranceDefinitionException("Invalid CircuitBreaker on "+ annotated.toString() +" : failureRation should be between 0 and 1");
+        }
+        if(get(SUCCESS_THRESHOLD, Integer.class) < 1) {
+            throw new FaultToleranceDefinitionException("Invalid CircuitBreaker on "+ annotated.toString() +" : successThreshold shouldn't be lower than 1");
+        }
     }
 
     @Override
