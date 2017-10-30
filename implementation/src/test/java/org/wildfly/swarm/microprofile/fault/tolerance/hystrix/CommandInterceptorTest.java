@@ -24,6 +24,7 @@ import java.util.concurrent.Future;
 import javax.enterprise.inject.spi.Extension;
 import javax.inject.Inject;
 
+import org.eclipse.microprofile.faulttolerance.exceptions.CircuitBreakerOpenException;
 import org.jboss.arquillian.container.test.api.Deployment;
 import org.jboss.arquillian.testng.Arquillian;
 import org.jboss.shrinkwrap.api.ShrinkWrap;
@@ -33,7 +34,6 @@ import org.jboss.shrinkwrap.api.spec.JavaArchive;
 import org.testng.annotations.Test;
 import org.wildfly.swarm.microprofile.fault.tolerance.hystrix.extension.HystrixExtension;
 
-import com.netflix.hystrix.exception.HystrixRuntimeException;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -95,6 +95,155 @@ public class CommandInterceptorTest extends Arquillian {
         @SuppressWarnings("unchecked")
         Future<String> future = (Future<String>) result;
         assertEquals(MyFallbackHandler.FALLBACK, future.get());
+    }
+
+    @Test
+    public void testSayHelloBreaker() {
+        for(int n = 0; n < 7; n ++) {
+            try {
+                String result = service.sayHelloBreaker();
+                System.out.printf("%d: Result: %s\n", n, result);
+                System.out.flush();
+            } catch (Exception e) {
+                System.out.printf("%d: Saw exception: %s\n", n, e);
+                System.out.flush();
+            }
+        }
+        int count = service.getSayHelloBreakerCount();
+        assertEquals(count,4, "The number of executions should be 4");
+
+    }
+
+    @Test
+    public void testSayHelloBreakerClassLevel() {
+        for(int n = 0; n < 7; n ++) {
+            try {
+                String result = service.sayHelloBreakerClassLevel();
+                System.out.printf("%d: Result: %s\n", n, result);
+                System.out.flush();
+            } catch (Exception e) {
+                System.out.printf("%d: Saw exception: %s\n", n, e);
+                System.out.flush();
+            }
+        }
+        int count = service.getSayHelloBreakerCount3();
+        assertEquals(count,4, "The number of executions should be 4");
+
+    }
+
+    @Test
+    public void testSayHelloBreaker2() {
+        for (int i = 1; i < 12; i++) {
+
+            try {
+                String result = service.sayHelloBreaker2();
+                System.out.printf("%d, %s\n", i, result);
+
+                if (i < 5 || (i > 6 && i < 12)) {
+                    fail("serviceA should throw an Exception in testCircuitDefaultSuccessThreshold on iteration " + i);
+                }
+            }
+            catch (CircuitBreakerOpenException cboe) {
+                // Expected on execution 5 and iteration 10
+                System.out.printf("%d, CircuitBreakerOpenException\n", i);
+
+                if (i < 5) {
+                    fail("serviceA should throw a RuntimeException in testCircuitDefaultSuccessThreshold on iteration " + i);
+                }
+                else if (i == 5) {
+                    // Pause to allow the circuit breaker to half-open
+                    try {
+                        Thread.sleep(2000);
+                    }
+                    catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+            catch (RuntimeException ex) {
+                // Expected
+                System.out.printf("%d, RuntimeException\n", i);
+            }
+            catch (Exception ex) {
+                // Not Expected
+                fail("serviceA should throw a RuntimeException or CircuitBreakerOpenException in testCircuitDefaultSuccessThreshold "
+                                    + "on iteration " + i);
+            }
+        }
+        int count = service.getSayHelloBreakerCount2();
+        assertEquals(count,9, "The number of serviceA executions should be 9");
+    }
+
+    @Test
+    public void testClassLevelCircuitOverride() {
+        for (int i = 0; i < 7; i++) {
+            try {
+                service.sayHelloBreakerOverride();
+
+                if (i < 2) {
+                    fail("sayHelloBreakerOverride should throw an Exception in testClassLevelCircuitOverride on iteration " + i);
+                }
+            }
+            catch (CircuitBreakerOpenException cboe) {
+                // Expected on iteration 4
+                if (i < 2) {
+                    fail("sayHelloBreakerOverride should throw a RuntimeException in testClassLevelCircuitOverride on iteration " + i);
+                }
+            }
+            catch (RuntimeException ex) {
+                // Expected
+            }
+            catch (Exception ex) {
+                // Not Expected
+                fail("sayHelloBreakerOverride should throw a RuntimeException or CircuitBreakerOpenException in testClassLevelCircuitOverride "
+                                    + "on iteration " + i);
+            }
+        }
+
+        int count = service.getSayHelloBreakerCount4();
+
+        assertEquals(count, 2, "The number of executions should be 2");
+    }
+
+
+    @Test(enabled = false, description = "Still trying to figure out @CircuitBreaker(successThreshold=...)")
+    public void testCircuitHighSuccessThreshold() {
+        for (int i = 1; i < 10; i++) {
+
+            try {
+                service.sayHelloBreakerHighThreshold();
+
+                if (i < 5 || i > 7) {
+                    fail("serviceA should throw an Exception in testCircuitHighSuccessThreshold on iteration " + i);
+                }
+            }
+            catch (CircuitBreakerOpenException cboe) {
+                // Expected on iteration 4 and iteration 10
+                if (i < 5) {
+                    fail("serviceA should throw a RuntimeException in testCircuitHighSuccessThreshold on iteration " + i);
+                }
+                else if (i == 5) {
+                    // Pause to allow the circuit breaker to half-open
+                    try {
+                        Thread.sleep(2000);
+                    }
+                    catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+            catch (RuntimeException ex) {
+                // Expected
+            }
+            catch (Exception ex) {
+                // Not Expected
+                fail("serviceA should throw a RuntimeException or CircuitBreakerOpenException in testCircuitHighSuccessThreshold "
+                                    + "on iteration " + i);
+            }
+        }
+        int count = service.getSayHelloBreakerCount5();
+
+        assertEquals(count, 7, "The number of serviceA executions should be 7");
     }
 
 }

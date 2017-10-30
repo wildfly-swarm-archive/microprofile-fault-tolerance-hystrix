@@ -20,6 +20,8 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.function.Supplier;
 
+import com.netflix.hystrix.HystrixCircuitBreaker;
+import org.wildfly.swarm.microprofile.fault.tolerance.hystrix.config.CircuitBreakerConfig;
 import org.wildfly.swarm.microprofile.fault.tolerance.hystrix.config.RetryContext;
 
 
@@ -38,7 +40,12 @@ public class DefaultCommand extends com.netflix.hystrix.HystrixCommand<Object> {
         this.toRun = toRun;
         this.fallback = fallback;
         this.retryContext = retryContext;
-
+    }
+    protected DefaultCommand(Setter setter, Supplier<Object> toRun, Supplier<Object> fallback, RetryContext retryContext, HystrixCircuitBreaker circuitBreaker) {
+        super(setter, circuitBreaker);
+        this.toRun = toRun;
+        this.fallback = fallback;
+        this.retryContext = retryContext;
     }
 
     @Override
