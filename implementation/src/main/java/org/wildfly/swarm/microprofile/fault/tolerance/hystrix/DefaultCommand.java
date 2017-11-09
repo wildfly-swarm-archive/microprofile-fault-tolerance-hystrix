@@ -21,14 +21,13 @@ import java.util.Arrays;
 import java.util.function.Supplier;
 
 import com.netflix.hystrix.HystrixCircuitBreaker;
-import org.wildfly.swarm.microprofile.fault.tolerance.hystrix.config.CircuitBreakerConfig;
 import org.wildfly.swarm.microprofile.fault.tolerance.hystrix.config.RetryContext;
 
 
 /**
  * @author Antoine Sabot-Durand
  */
-public class DefaultCommand extends com.netflix.hystrix.HystrixCommand<Object> {
+public class DefaultCommand extends com.netflix.hystrix.FixedHystrixCommand<Object> {
 
     /**
      * @param setter
