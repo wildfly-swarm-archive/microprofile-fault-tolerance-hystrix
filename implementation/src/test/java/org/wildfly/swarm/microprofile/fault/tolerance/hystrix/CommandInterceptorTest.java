@@ -25,12 +25,14 @@ import javax.enterprise.inject.spi.Extension;
 import javax.inject.Inject;
 
 import org.eclipse.microprofile.faulttolerance.exceptions.CircuitBreakerOpenException;
+import org.eclipse.microprofile.faulttolerance.exceptions.TimeoutException;
 import org.jboss.arquillian.container.test.api.Deployment;
 import org.jboss.arquillian.testng.Arquillian;
 import org.jboss.shrinkwrap.api.ShrinkWrap;
 import org.jboss.shrinkwrap.api.asset.EmptyAsset;
 import org.jboss.shrinkwrap.api.spec.JavaArchive;
 
+import org.testng.Assert;
 import org.testng.annotations.Test;
 import org.wildfly.swarm.microprofile.fault.tolerance.hystrix.extension.HystrixExtension;
 
@@ -59,6 +61,8 @@ public class CommandInterceptorTest extends Arquillian {
 
     @Inject
     MyMicroservice service;
+    @Inject
+    MyRetryMicroservice serviceRetry;
 
     @Test
     public void shouldRunWithLongExecutionTime() {
@@ -206,7 +210,7 @@ public class CommandInterceptorTest extends Arquillian {
     }
 
 
-    @Test(enabled = false, description = "Still trying to figure out @CircuitBreaker(successThreshold=...)")
+    @Test(enabled = true, description = "Still trying to figure out @CircuitBreaker(successThreshold=...)")
     public void testCircuitHighSuccessThreshold() {
         for (int i = 1; i < 10; i++) {
 
@@ -246,4 +250,76 @@ public class CommandInterceptorTest extends Arquillian {
         assertEquals(count, 7, "The number of serviceA executions should be 7");
     }
 
+    /**
+     * A test to exercise Circuit Breaker thresholds with sufficient retries to open the
+     * Circuit and result in a CircuitBreakerOpenException.
+     */
+    @Test
+    public void testCircuitOpenWithMoreRetries() {
+        int invokeCounter = 0;
+        try {
+            serviceRetry.sayHelloRetry();
+            invokeCounter = serviceRetry.getSayHelloRetry();
+            if (invokeCounter < 4) {
+                fail("serviceA should retry in testCircuitOpenWithMoreRetries on iteration "
+                                    + invokeCounter);
+            }
+        }
+        catch (CircuitBreakerOpenException cboe) {
+            // Expected on iteration 4
+            invokeCounter = serviceRetry.getSayHelloRetry();
+            if (invokeCounter < 4) {
+                fail("serviceA should retry in testCircuitOpenWithMoreRetries on iteration "
+                                    + invokeCounter);
+            }
+        }
+        catch (Exception ex) {
+            // Not Expected
+            invokeCounter = serviceRetry.getSayHelloRetry();
+            fail("serviceA should retry or throw a CircuitBreakerOpenException in testCircuitOpenWithMoreRetries on iteration "
+                                + invokeCounter);
+        }
+
+        invokeCounter = serviceRetry.getSayHelloRetry();
+        assertEquals(invokeCounter, 4, "The number of executions should be 4");
+    }
+
+    @Test
+    public void testRetryTimeout() {
+        try {
+            String result = serviceRetry.serviceA(1000);
+        }
+        catch (TimeoutException ex) {
+            // Expected
+        }
+        catch (RuntimeException ex) {
+            // Not Expected
+            Assert.fail("serviceA should not throw a RuntimeException in testRetryTimeout");
+        }
+
+        Assert.assertEquals(serviceRetry.getCounterForInvokingServiceA(), 2, "The execution count should be 2 (1 retry + 1)");
+    }
+
+    @Test
+    public void testFallbackSuccess() {
+
+        try {
+            String result = serviceRetry.serviceA();
+            Assert.assertTrue(result.contains("serviceA"),
+                              "The message should be \"fallback for serviceA\"");
+        }
+        catch (RuntimeException ex) {
+            Assert.fail("serviceA should not throw a RuntimeException in testFallbackSuccess");
+        }
+        Assert.assertEquals(serviceRetry.getCounterForInvokingServiceA(), 2, "The execution count should be 2 (1 retry + 1)");
+        try {
+            String result = serviceRetry.serviceB();
+            Assert.assertTrue(result.contains("serviceB"),
+                              "The message should be \"fallback for serviceB\"");
+        }
+        catch (RuntimeException ex) {
+            Assert.fail("serviceB should not throw a RuntimeException in testFallbackSuccess");
+        }
+        Assert.assertEquals(serviceRetry.getCounterForInvokingServiceB(), 3, "The execution count should be 3 (2 retries + 1)");
+    }
 }

@@ -21,6 +21,7 @@ import javax.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.faulttolerance.Asynchronous;
 import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
 import org.eclipse.microprofile.faulttolerance.Fallback;
+import org.eclipse.microprofile.faulttolerance.Retry;
 import org.eclipse.microprofile.faulttolerance.Timeout;
 
 
@@ -137,11 +138,12 @@ public class MyMicroservice {
     @CircuitBreaker(successThreshold = 3, requestVolumeThreshold = 4, failureRatio=0.75, delay = 1000)
     public String sayHelloBreakerHighThreshold() {
         sayHelloBreakerCount5 ++;
-        // Only one execution succeeds
+        System.err.printf("sayHelloBreakerHighThreshold, %d\n", sayHelloBreakerCount5);
+        // Only two execution succeeds
         if(sayHelloBreakerCount5 < 5 || sayHelloBreakerCount5 > 6) {
             throw new RuntimeException("Connection failed");
         }
-        return "sayHelloBreaker#"+sayHelloBreakerCount2;
+        return "sayHelloBreaker#"+sayHelloBreakerCount5;
     }
     public int getSayHelloBreakerCount5() {
         return sayHelloBreakerCount5;
