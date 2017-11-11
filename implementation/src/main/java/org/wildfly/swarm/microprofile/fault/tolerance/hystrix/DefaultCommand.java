@@ -27,7 +27,7 @@ import org.wildfly.swarm.microprofile.fault.tolerance.hystrix.config.RetryContex
 /**
  * @author Antoine Sabot-Durand
  */
-public class DefaultCommand extends com.netflix.hystrix.HystrixCommand<Object> {
+public class DefaultCommand extends com.netflix.hystrix.FixedHystrixCommand<Object> {
 
     /**
      * @param setter
