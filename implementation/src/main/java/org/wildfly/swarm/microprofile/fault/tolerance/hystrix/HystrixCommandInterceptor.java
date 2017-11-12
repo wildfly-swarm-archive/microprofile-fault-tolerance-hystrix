@@ -20,6 +20,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
@@ -125,8 +126,10 @@ public class HystrixCommandInterceptor {
                     case TIMEOUT: {
                         if (metadata.retryContext != null && metadata.retryContext.getMaxExecNumber() > 0) {
                             //retry.incMaxNumberExec();
-                            shouldRunCommand = true;
-                            continue;
+                            shouldRunCommand = shouldRetry(metadata.retryContext, new TimeoutException(e));
+                            if (shouldRunCommand) {
+                                continue;
+                            }
                         }
                         throw new TimeoutException(e);
                     }
@@ -135,8 +138,11 @@ public class HystrixCommandInterceptor {
                     case REJECTED_THREAD_EXECUTION:
                     case REJECTED_SEMAPHORE_EXECUTION:
                     case REJECTED_SEMAPHORE_FALLBACK:
-                    case BAD_REQUEST_EXCEPTION:
                     case COMMAND_EXCEPTION:
+                        if (metadata.retryContext != null && metadata.retryContext.getMaxExecNumber() > 0) {
+                            shouldRunCommand = shouldRetry(metadata.retryContext, e);
+                            continue;
+                        }
                     default:
                         throw e;
                 }
@@ -215,6 +221,27 @@ public class HystrixCommandInterceptor {
                 .andCommandKey(HystrixCommandKey.Factory.asKey(method.getDeclaringClass().getName() + method.toString()))
                 .andCommandPropertiesDefaults(propertiesSetter)
                 .andThreadPoolPropertiesDefaults(threadPoolSetter);
+    }
+
+    private boolean shouldRetry(RetryContext retryContext, Exception e) throws Exception {
+        boolean shouldRetry = false;
+        // Decrement the retry count for this attempt
+        retryContext.doRetry();
+        // Check the exception type
+        if (Arrays.stream(retryContext.getAbortOn()).noneMatch(ex -> ex.isAssignableFrom(e.getClass()))
+                && (retryContext.getRetryOn().length == 0 || Arrays.stream(retryContext.getRetryOn()).anyMatch(ex -> ex.isAssignableFrom(e.getClass())))
+                && retryContext.shouldRetry()
+                && System.nanoTime() - retryContext.getStart() <= retryContext.getMaxDuration()) {
+            Long jitterBase = retryContext.get(RetryContext.JITTER,Long.class);
+            if (retryContext.getDelay() > 0) {
+                long jitter = (long) (Math.random() * ((jitterBase * 2) + 1)) - jitterBase; // random number between -jitter and +jitter
+                Thread.sleep(retryContext.getDelay() + Duration.of(jitter, retryContext.get(RetryContext.JITTER_DELAY_UNIT)).toMillis());
+            }
+            shouldRetry = true;
+        } else {
+            throw e;
+        }
+        return shouldRetry;
     }
 
     private final Map<Method, CommandMetadata> commandMetadataMap = new ConcurrentHashMap<>();

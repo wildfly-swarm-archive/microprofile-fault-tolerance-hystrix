@@ -87,6 +87,7 @@
               <suiteXmlFiles>
                 <suiteXmlFile>src/test/resources/tck-suite.xml</suiteXmlFile>
               </suiteXmlFiles>
+              <redirectTestOutputToFile>true</redirectTestOutputToFile>
             </configuration>
           </plugin>
         </plugins>

@@ -39,16 +39,34 @@ public class DefaultCommand extends com.netflix.hystrix.FixedHystrixCommand<Obje
         this.toRun = toRun;
         this.fallback = fallback;
         this.retryContext = retryContext;
+        this.hasCircuitBreaker = false;
     }
     protected DefaultCommand(Setter setter, Supplier<Object> toRun, Supplier<Object> fallback, RetryContext retryContext, HystrixCircuitBreaker circuitBreaker) {
         super(setter, circuitBreaker);
         this.toRun = toRun;
         this.fallback = fallback;
         this.retryContext = retryContext;
+        this.hasCircuitBreaker = true;
     }
 
     @Override
     protected Object run() throws Exception {
+        Object res;
+        if (!hasCircuitBreaker) {
+            res = runWithRetry();
+        } else {
+            res = basicRun();
+        }
+        return res;
+    }
+
+    /**
+     * Run and handle the @Retry logic in the execution loop. This only works when a @CircuitBreaker configuraiton
+     * does not exist.
+     * @return the run result
+     * @throws Exception on execution failure
+     */
+    protected Object runWithRetry() throws Exception {
         Object res = null;
         boolean notExecuted = true;
         if (retryContext == null) {
@@ -101,5 +119,5 @@ public class DefaultCommand extends com.netflix.hystrix.FixedHystrixCommand<Obje
 
     private final RetryContext retryContext;
 
-
+    private final boolean hasCircuitBreaker;
 }

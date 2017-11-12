@@ -35,21 +35,13 @@
       <class name="org.eclipse.microprofile.fault.tolerance.tck.ConfigTest"/>
 
 
-     <class name="org.eclipse.microprofile.fault.tolerance.tck.FallbackTest"/>
+     <class name="org.eclipse.microprofile.fault.tolerance.tck.FallbackTest">
+     </class>
 
       <class name="org.eclipse.microprofile.fault.tolerance.tck.CircuitBreakerTest">
-        <!--1 test out of 7 don't pass -->
-        <methods>
-          <exclude name="testCircuitHighSuccessThreshold"/>
-        </methods>
       </class>
 
       <class name="org.eclipse.microprofile.fault.tolerance.tck.CircuitBreakerRetryTest">
-        <methods>
-          <exclude name="testCircuitOpenWithMoreRetries"/>
-          <exclude name="testCircuitOpenWithMultiTimeouts"/>
-          <exclude name="testClassLevelCircuitOpenWithMoreRetries"/>
-        </methods>
       </class>
 
       <class name="org.eclipse.microprofile.fault.tolerance.tck.bulkhead.BulkheadSynchTest"/>
