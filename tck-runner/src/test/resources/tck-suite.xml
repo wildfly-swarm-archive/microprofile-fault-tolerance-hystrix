@@ -24,30 +24,9 @@
       <package name="org.eclipse.microprofile.fault.tolerance.tck.invalidParameters"/>
       <package name="org.eclipse.microprofile.fault.tolerance.tck.illegalConfig" />
       <package name="org.eclipse.microprofile.fault.tolerance.tck.disableEnv" />
+      <package name="org.eclipse.microprofile.fault.tolerance.tck"/>
+      <package name="org.eclipse.microprofile.fault.tolerance.bulkhead"/>
     </packages>
-
-    <classes>
-
-      <class name="org.eclipse.microprofile.fault.tolerance.tck.TimeoutTest"/>
-      <class name="org.eclipse.microprofile.fault.tolerance.tck.RetryTest"/>
-      <class name="org.eclipse.microprofile.fault.tolerance.tck.RetryConditionTest"/>
-      <class name="org.eclipse.microprofile.fault.tolerance.tck.RetryTimeoutTest"/>
-      <class name="org.eclipse.microprofile.fault.tolerance.tck.ConfigTest"/>
-
-
-     <class name="org.eclipse.microprofile.fault.tolerance.tck.FallbackTest">
-     </class>
-
-      <class name="org.eclipse.microprofile.fault.tolerance.tck.CircuitBreakerTest">
-      </class>
-
-      <class name="org.eclipse.microprofile.fault.tolerance.tck.CircuitBreakerRetryTest">
-      </class>
-
-      <class name="org.eclipse.microprofile.fault.tolerance.tck.bulkhead.BulkheadSynchTest"/>
-
-    </classes>
-
 
   </test>
 
