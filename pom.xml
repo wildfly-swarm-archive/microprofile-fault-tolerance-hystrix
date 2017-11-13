@@ -43,6 +43,7 @@
     <version.microprofile-config-api>1.1</version.microprofile-config-api>
     <version.weld>2.4.5.Final</version.weld>
     <version.testng>6.11</version.testng>
+    <version.jboss-logging>3.3.1.Final</version.jboss-logging>
   </properties>
 
   <scm>
@@ -51,12 +52,10 @@
     <url>https://github.com/wildfly-swarm/microprofile-fault-tolerance-hystrix</url>
   </scm>
 
-
   <modules>
     <module>implementation</module>
     <module>tck-runner</module>
   </modules>
-
 
   <dependencyManagement>
     <dependencies>
@@ -86,27 +85,27 @@
         <version>${version.cdi-api}</version>
         <scope>provided</scope>
       </dependency>
+
       <dependency>
         <groupId>javax.annotation</groupId>
         <artifactId>javax.annotation-api</artifactId>
         <version>${version.javax.annotation-api}</version>
         <scope>provided</scope>
       </dependency>
+
       <dependency>
         <groupId>com.netflix.hystrix</groupId>
         <artifactId>hystrix-core</artifactId>
         <version>${version.hystrix-core}</version>
       </dependency>
+
       <dependency>
-        <groupId>io.reactivex</groupId>
-        <artifactId>rxjava</artifactId>
-        <version>1.2.0</version>
+         <groupId>org.jboss.logging</groupId>
+         <artifactId>jboss-logging</artifactId>
+         <version>${version.jboss-logging}</version>
       </dependency>
-      <dependency>
-        <groupId>org.hdrhistogram</groupId>
-        <artifactId>HdrHistogram</artifactId>
-        <version>2.1.9</version>
-      </dependency>
+
+      <!-- Test dependencies -->
 
       <dependency>
         <groupId>org.slf4j</groupId>
@@ -114,6 +113,7 @@
         <version>${version.slf4j}</version>
         <scope>test</scope>
       </dependency>
+
       <dependency>
         <groupId>org.eclipse.microprofile.fault-tolerance</groupId>
         <artifactId>microprofile-fault-tolerance-tck</artifactId>
