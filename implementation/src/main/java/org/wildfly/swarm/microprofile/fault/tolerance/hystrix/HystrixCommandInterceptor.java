@@ -109,9 +109,9 @@ public class HystrixCommandInterceptor {
             if (metadata.hasCircuitBreaker()) {
                 HystrixCommandKey key = HystrixCommandKey.Factory.asKey(method.getDeclaringClass().getName() + method.toString());
                 syncCircuitBreaker = SynchronousCircuitBreaker.getCircuitBreaker(key, metadata.circuitBreakerConfig);
-                command = new DefaultCommand(metadata.setter, ctx::proceed, fallback, retryContext, syncCircuitBreaker);
+                command = new DefaultCommand(metadata.setter, ctx::proceed, fallback, retryContext, syncCircuitBreaker, async != null);
             } else {
-                command = new DefaultCommand(metadata.setter, ctx::proceed, fallback, retryContext);
+                command = new DefaultCommand(metadata.setter, ctx::proceed, fallback, retryContext, async != null);
             }
 
             if (syncCircuitBreaker != null && syncCircuitBreaker.allowRequest() == false) {
@@ -157,7 +157,6 @@ public class HystrixCommandInterceptor {
                 }
             }
         }
-
         return res;
     }
 
@@ -263,8 +262,14 @@ public class HystrixCommandInterceptor {
             TimeoutConfig timeoutConfig = timeout != null ? new TimeoutConfig(timeout, method) : null;
             Bulkhead bulkhead = getAnnotation(method, Bulkhead.class);
             BulkheadConfig bulkheadConfig = bulkhead != null ? new BulkheadConfig(bulkhead, method) : null;
+
             CircuitBreaker circuitBreaker = getAnnotation(method, CircuitBreaker.class);
-            this.circuitBreakerConfig = circuitBreaker != null ? new CircuitBreakerConfig(circuitBreaker, method) : null;
+            if (nonFallBackEnable && circuitBreaker != null) {
+                this.circuitBreakerConfig = new CircuitBreakerConfig(circuitBreaker, method);
+            } else {
+                this.circuitBreakerConfig = null;
+            }
+
             // Initialize Hystrix command setter
             this.setter = initSetter(method, timeoutConfig, circuitBreakerConfig, bulkheadConfig);
 
